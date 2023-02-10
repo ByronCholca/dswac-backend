@@ -1,0 +1,43 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('GIT') {
+            steps {
+                git branch:'main', url:'https://github.com/emilio-vera/dswac-backend.git'
+            }
+        }
+        
+        stage('BUILD'){
+            steps {
+                script {
+                    sh 'sh mvnw clean install -Dmaven.test.skip=true'
+                    sh 'sh mvnw checkstyle:checkstyle'
+                }
+            }
+        }
+        
+        stage('TEST'){
+            steps {
+                script {
+                    sh 'mvn test'
+                }
+            }
+        }
+        
+        stage('SONAR'){
+            steps {
+                script {
+                    withSonarQubeEnv(installationName: 'sonar-server', credentialsId: 'sonar-id') {
+                        sh 'mvn verify sonar:sonar -Dsonar.projectKey=dswac-backend -Dsonar.projectName:dswac-backend, -Dsonar.host:http://localhost:9000'
+                    }
+                    
+                    def quality = waitForQualityGate()
+                    if(quality.status != "OK") {
+                        error "Error en pipeline, fue cerrado por qualityGate ${quality.status}"
+                    }
+                }
+            }
+        }
+    }
+}
